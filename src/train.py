@@ -7,7 +7,7 @@ from src.models import build_random_forest
 from src.utils import pinball_loss
 
 
-# Random Forest Training
+# RF train
 def train_random_forest(X_train_scaled, y_train, X_val_scaled, y_val,
                         n_estimators=100, max_depth=15,
                         random_state=123, n_jobs=-1):
@@ -23,7 +23,7 @@ def train_random_forest(X_train_scaled, y_train, X_val_scaled, y_val,
     return rf, y_pred, r2_scores
 
 
-# CNN training loop
+# CNN train
 def train_cnn(model, train_loader, val_loader,
               epochs=100, lr=1e-3, device='cpu',
               print_every=10):
@@ -31,14 +31,13 @@ def train_cnn(model, train_loader, val_loader,
     model = model.to(device)
     optimiser = torch.optim.Adam(model.parameters(), lr=lr)
     
-    # Assigned function handle directly
     loss_fn = pinball_loss
 
     train_losses = []
     val_losses = []
 
     for epoch in range(epochs):
-        # Training
+
         model.train()
         batch_losses = []
         for spec_b, aux_b, y_b in train_loader:
@@ -46,7 +45,6 @@ def train_cnn(model, train_loader, val_loader,
             optimiser.zero_grad()
             pred = model(spec_b, aux_b)
             
-            # Executed actively on batch data
             loss = loss_fn(pred, y_b)
             
             loss.backward()
@@ -54,7 +52,6 @@ def train_cnn(model, train_loader, val_loader,
             batch_losses.append(loss.item())
         train_loss = np.mean(batch_losses)
 
-        # Validation
         model.eval()
         with torch.no_grad():
             val_batch_losses = []
@@ -62,7 +59,6 @@ def train_cnn(model, train_loader, val_loader,
                 spec_b, aux_b, y_b = spec_b.to(device), aux_b.to(device), y_b.to(device)
                 pred = model(spec_b, aux_b)
                 
-                # Executed actively on validation batch data
                 val_batch_losses.append(loss_fn(pred, y_b).item())
             val_loss = np.mean(val_batch_losses)
 
@@ -74,7 +70,6 @@ def train_cnn(model, train_loader, val_loader,
                   f"train loss: {train_loss:.4f} — "
                   f"val loss: {val_loss:.4f}")
 
-    # Gather final validation predictions in correct order
     model.eval()
     y_pred_list = []
     y_val_list  = []

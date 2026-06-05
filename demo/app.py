@@ -6,11 +6,9 @@ import joblib
 import sys
 import os
 
-# Setup pathing
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.models import ExoplanetCNN
 
-# Configuration
 BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'models'))
 CSV_PATH = os.path.join(BASE_DIR, 'demo_planets.csv')
@@ -46,12 +44,10 @@ def load_assets():
 cnn_model, spec_scaler, aux_scaler = load_assets()
 df = pd.read_csv(CSV_PATH, index_col='planet_ID')
 
-# Limit records for UI
 available_ids = df.index.tolist()[:5]
 greek_names = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"]
 planet_mapping = dict(zip(greek_names, available_ids))
 
-# UI Layout
 st.title("Exoplanet Atmospheric Retrieval Evaluation")
 st.markdown("---")
 
@@ -63,7 +59,6 @@ spec_raw = row[SPECTRAL_COLS].values.astype(float).reshape(1, -1)
 aux_raw = row[AUX_COLS].values.astype(float).reshape(1, -1)
 true_ret = row[TARGET_COLS].values.astype(float)
 
-# Inference
 spec_scaled = spec_scaler.transform(spec_raw)
 aux_scaled = aux_scaler.transform(aux_raw)
 spec_t = torch.tensor(spec_scaled, dtype=torch.float32).unsqueeze(1)
@@ -72,7 +67,6 @@ aux_t = torch.tensor(aux_scaled, dtype=torch.float32)
 with torch.no_grad():
     cnn_pred = cnn_model(spec_t, aux_t).numpy().flatten()
 
-# Metadata
 meta_cols = st.columns(4)
 with meta_cols[0]:
     st.metric("Surface Gravity", f"{row['planet_surface_gravity']:.2f} m/s²")
@@ -85,8 +79,9 @@ with meta_cols[3]:
 
 st.markdown("---")
 
-# Data Table Transformation
 table_rows = []
+percentage_rows = []
+
 for idx, gas_name in enumerate(GASES):
     c_q1, c_q2, c_q3 = cnn_pred[idx*3 : idx*3 + 3]
     t_q1, t_q2, t_q3 = true_ret[idx*3 : idx*3 + 3]
@@ -99,7 +94,23 @@ for idx, gas_name in enumerate(GASES):
         "CNN Prediction (q2)": f"{c_q2:.3f} (Δ {err_cnn:.2f})",
         "Confidence Interval": f"[{c_q1:.2f}, {c_q3:.2f}]"
     })
+    
+    true_pct = (10 ** t_q2) * 100
+    cnn_pct = (10 ** c_q2) * 100
+    
+    percentage_rows.append({
+        "Target Molecule": gas_name,
+        "True Composition": f"{true_pct:.5g}%",
+        "Predicted Composition": f"{cnn_pct:.5g}%"
+    })
 
 summary_df = pd.DataFrame(table_rows).set_index("Target Molecule")
-st.subheader("Chemical Abundance Matrix ($\log_{10}$ Abundance)")
+st.subheader("Chemical Abundance Matrix (log10 Abundance)")
 st.dataframe(summary_df, use_container_width=True)
+
+st.markdown("---")
+
+pct_df = pd.DataFrame(percentage_rows).set_index("Target Molecule")
+st.subheader("Actual Atmospheric Composition (%)")
+st.markdown("*Translated from log abundances. Exoplanet atmospheres are heavily dominated by $H_2$ and $He$, so trace gas percentages are naturally microscopic.*")
+st.dataframe(pct_df, use_container_width=True)

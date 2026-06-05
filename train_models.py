@@ -46,7 +46,7 @@ if not os.path.isfile(expected_path):
 # 1. Load data 
 
 print("Loading data...")
-spectral, aux, labels, fm = load_raw_data(DATA_DIR)
+spectral, aux, labels = load_raw_data(DATA_DIR)
 X, y, labelled_ids, wavelengths = prepare_data(spectral, aux, labels)
 print(f"X shape: {X.shape}  y shape: {y.shape}")
 
