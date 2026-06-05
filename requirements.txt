@@ -1,0 +1,8 @@
+torch>=1.10
+numpy
+pandas
+matplotlib
+scikit-learn
+joblib
+h5py
+streamlit
