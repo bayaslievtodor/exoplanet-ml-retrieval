@@ -40,6 +40,10 @@ https://exoplanet-ml-retrieval-icjapra39vletquko9sgj3.streamlit.app/#chemical-ab
 
 ## Training The Models Yourself
 
+To train the model, simply copy the repository and execute train_models.py. 
+
 Keep in mind - the repository alone is not enough to train the models, you will also need the raw data.
+
 You may find the data here: https://www.ariel-datachallenge.space/adc2023/
+
 **Important:** Simply extract the folder "FullDataset" in the main directory exactly the way it came packaged. Don't rename or take anything out.
