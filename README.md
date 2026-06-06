@@ -40,7 +40,7 @@ https://exoplanet-ml-retrieval-icjapra39vletquko9sgj3.streamlit.app/#chemical-ab
 
 ## Training The Models Yourself
 
-To train the model, simply copy the repository and execute train_models.py. 
+To train the model, simply copy the repository, download the data, and execute train_models.py. 
 
 Keep in mind - the repository alone is not enough to train the models, you will also need the raw data.
 
