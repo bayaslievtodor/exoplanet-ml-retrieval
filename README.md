@@ -1,7 +1,7 @@
 # Exoplanet Atmospheric Retrieval via 1D CNN
 
-A ML alternative to Bayesian forward modeling for deep-space exoplanetary atmosphere observation. 
-Uses the simulated spectral data from the ARIEL-2023 Data Space Challenge: https://www.ariel-datachallenge.space/adc2023/
+A simple ML model for predicting a exoplanet's atmospheric composition based on spectroscopic and astronomical data. 
+Uses the simulated data from the ARIEL-2023 Data Space Challenge: https://www.ariel-datachallenge.space/adc2023/
 
 ## Core Idea
 
@@ -11,7 +11,7 @@ This project demonstrates an ML prototype as an alternative - specifically 1D Co
 
 ## Design Document
 
-The design document contains thorough information and documentation behind the architectural choices, including the transition from tabular to neural models and an in-depth performance evaluation. 
+The design document contains thorough information and documentation behind the architectural choices, including the design path from tabular to neural models and an in-depth performance evaluation. 
 
 [**View Design Doc PDF**](./design_document.pdf)
 
