@@ -26,8 +26,8 @@ https://exoplanet-ml-retrieval-icjapra39vletquko9sgj3.streamlit.app/#chemical-ab
 * Primary Model: 1D CNN + MLP Dual-Pathway Fusion.
   * Pathway 1: 1D Convolutions process 52-channel spectral data to capture spatial/frequency relationships (e.g., broad absorption signatures).
   * Pathway 2: A Multilayer Perceptron (MLP) encodes auxiliary data (star radius, planet mass, etc.).
-* Loss Function Pinball Loss is used  to predict quantiles (q1, q2, q3), providing built-in uncertainty estimation in respect to the training data variables.
-* **Target Molecules: H2O, CO2, CO, CH4, NH3.
+* Loss Function: Pinball Loss is used  to predict quantiles (q1, q2, q3), providing built-in uncertainty estimation in respect to the training data variables.
+* Target Molecules: H2O, CO2, CO, CH4, NH3.
 
 ## Repo Structure
 
