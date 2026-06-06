@@ -1,10 +1,11 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import torch
-import joblib
-import sys
 import os
+import sys
+import joblib
+import numpy as np
+import pandas as pd
+import streamlit as st
+import torch
+import matplotlib.pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.models import ExoplanetCNN
@@ -37,80 +38,105 @@ def load_assets():
     cnn = ExoplanetCNN()
     cnn.load_state_dict(torch.load(CNN_MODEL_PATH, map_location='cpu'))
     cnn.eval()
-    spec_scaler = joblib.load(SPEC_SCALER_PATH)
-    aux_scaler = joblib.load(AUX_SCALER_PATH)
-    return cnn, spec_scaler, aux_scaler
+    return cnn, joblib.load(SPEC_SCALER_PATH), joblib.load(AUX_SCALER_PATH)
 
 cnn_model, spec_scaler, aux_scaler = load_assets()
 df = pd.read_csv(CSV_PATH, index_col='planet_ID')
 
-available_ids = df.index.tolist()[:5]
-greek_names = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"]
-planet_mapping = dict(zip(greek_names, available_ids))
+planet_mapping = dict(zip(["Alpha", "Beta", "Gamma", "Delta", "Epsilon"], df.index.tolist()[:5]))
 
-st.title("Exoplanet Atmospheric Retrieval Evaluation")
+st.title("Exoplanet Evaluation Demo")
 st.markdown("---")
 
-selected_nickname = st.selectbox("Select Target Planet", greek_names)
-target_id = planet_mapping[selected_nickname]
+col1, col2 = st.columns([2, 1])
+with col1:
+    selected_nickname = st.selectbox("Select Target Planet", list(planet_mapping.keys()))
+with col2:
+    show_rationale = st.toggle("Visualize Model Rationale")
 
-row = df.loc[target_id]
+row = df.loc[planet_mapping[selected_nickname]]
+
 spec_raw = row[SPECTRAL_COLS].values.astype(float).reshape(1, -1)
 aux_raw = row[AUX_COLS].values.astype(float).reshape(1, -1)
 true_ret = row[TARGET_COLS].values.astype(float)
 
-spec_scaled = spec_scaler.transform(spec_raw)
-aux_scaled = aux_scaler.transform(aux_raw)
-spec_t = torch.tensor(spec_scaled, dtype=torch.float32).unsqueeze(1)
-aux_t = torch.tensor(aux_scaled, dtype=torch.float32)
+spec_t = torch.tensor(spec_scaler.transform(spec_raw), dtype=torch.float32).unsqueeze(1)
+spec_t.requires_grad_(True)
+aux_t = torch.tensor(aux_scaler.transform(aux_raw), dtype=torch.float32)
 
-with torch.no_grad():
-    cnn_pred = cnn_model(spec_t, aux_t).numpy().flatten()
+cnn_pred = cnn_model(spec_t, aux_t)
 
 meta_cols = st.columns(4)
-with meta_cols[0]:
-    st.metric("Surface Gravity", f"{row['planet_surface_gravity']:.2f} m/s²")
-with meta_cols[1]:
-    st.metric("Orbital Period", f"{row['planet_orbital_period']:.2f} Days")
-with meta_cols[2]:
-    st.metric("Stellar Temperature", f"{int(row['star_temperature'])} K")
-with meta_cols[3]:
-    st.metric("Distance", f"{row['planet_distance']:.3f} AU")
+meta_cols[0].metric("Surface Gravity", f"{row['planet_surface_gravity']:.2f} m/s²")
+meta_cols[1].metric("Orbital Period", f"{row['planet_orbital_period']:.2f} Days")
+meta_cols[2].metric("Stellar Temperature", f"{int(row['star_temperature'])} K")
+meta_cols[3].metric("Distance", f"{row['planet_distance']:.3f} AU")
+
+st.markdown("---")
+st.subheader("52-Channel Transit Depth Spectrum")
+
+fig, ax = plt.subplots(figsize=(10, 3))
+ax.plot(range(1, 53), spec_raw[0], color="#1f77b4", linewidth=2, label="Transit Depth")
+
+if show_rationale:
+    gas_idx = st.selectbox("Select Gas to Explain", range(len(GASES)), format_func=lambda x: GASES[x])
+    target_output = cnn_pred[0, gas_idx*3 + 1]
+    target_output.backward()
+    saliency = spec_t.grad.abs().squeeze().detach().numpy()
+    
+    norm_saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-9)
+    ax.scatter(range(1, 53), spec_raw[0], c=norm_saliency, cmap='Reds', s=50, zorder=5, label="Importance")
+    ax.set_title(f"Model Attention for {GASES[gas_idx]}")
+
+ax.set_xlim(1, 52)
+ax.set_xlabel("Channel")
+ax.set_ylabel("Transit Depth")
+ax.grid(True, linestyle="--", alpha=0.5)
+st.pyplot(fig)
 
 st.markdown("---")
 
-table_rows = []
-percentage_rows = []
+table_rows, percentage_rows = [], []
+cnn_pred_flat = cnn_pred.detach().numpy().flatten()
 
 for idx, gas_name in enumerate(GASES):
-    c_q1, c_q2, c_q3 = cnn_pred[idx*3 : idx*3 + 3]
-    t_q1, t_q2, t_q3 = true_ret[idx*3 : idx*3 + 3]
-    
-    err_cnn = abs(c_q2 - t_q2)
+    c_q1, c_q2, c_q3 = cnn_pred_flat[idx*3 : idx*3 + 3]
+    t_q2 = true_ret[idx*3 + 1]
     
     table_rows.append({
         "Target Molecule": gas_name,
-        "Ground Truth (q2)": f"{t_q2:.3f}",
-        "CNN Prediction (q2)": f"{c_q2:.3f} (Δ {err_cnn:.2f})",
-        "Confidence Interval": f"[{c_q1:.2f}, {c_q3:.2f}]"
+        "Ground Truth (q2)": t_q2,
+        "CNN Prediction (q2)": c_q2,
+        "Δ (Error)": abs(c_q2 - t_q2),
+        "Confidence Interval": f"[{c_q1:.2f}, {c_q3:.2f}]",
+        "In Bounds?": "Y" if c_q1 <= t_q2 <= c_q3 else "N"
     })
-    
-    true_pct = (10 ** t_q2) * 100
-    cnn_pct = (10 ** c_q2) * 100
     
     percentage_rows.append({
         "Target Molecule": gas_name,
-        "True Composition": f"{true_pct:.5g}%",
-        "Predicted Composition": f"{cnn_pct:.5g}%"
+        "True Composition (%)": (10 ** t_q2) * 100,
+        "Predicted Composition (%)": (10 ** c_q2) * 100
     })
 
-summary_df = pd.DataFrame(table_rows).set_index("Target Molecule")
 st.subheader("Chemical Abundance Matrix (log10 Abundance)")
-st.dataframe(summary_df, use_container_width=True)
+st.dataframe(
+    pd.DataFrame(table_rows).set_index("Target Molecule").style.background_gradient(subset=['Δ (Error)'], cmap='YlOrRd'),
+    use_container_width=True,
+    column_config={
+        "Ground Truth (q2)": st.column_config.NumberColumn(format="%.3f"),
+        "CNN Prediction (q2)": st.column_config.NumberColumn(format="%.3f"),
+        "Δ (Error)": st.column_config.NumberColumn(format="%.2f"),
+        "In Bounds?": st.column_config.TextColumn()
+    }
+)
 
 st.markdown("---")
-
-pct_df = pd.DataFrame(percentage_rows).set_index("Target Molecule")
 st.subheader("Actual Atmospheric Composition (%)")
-st.markdown("*Translated from log abundances. Exoplanet atmospheres are heavily dominated by $H_2$ and $He$, so trace gas percentages are naturally microscopic.*")
-st.dataframe(pct_df, use_container_width=True)
+st.dataframe(
+    pd.DataFrame(percentage_rows).set_index("Target Molecule"), 
+    use_container_width=True,
+    column_config={
+        "True Composition (%)": st.column_config.NumberColumn(format="%.5g"),
+        "Predicted Composition (%)": st.column_config.NumberColumn(format="%.5g")
+    }
+)
